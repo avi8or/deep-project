@@ -1,8 +1,13 @@
 """Shared fixtures for /deep-project tests."""
 
 import os
-import pytest
+import sys
 from pathlib import Path
+
+import pytest
+
+# Add scripts directory to Python path so lib imports work
+sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
 
 @pytest.fixture

@@ -240,3 +240,28 @@ class TestSetupSessionScript:
         assert "tasks_written" in output
         assert "task_list_id" in output
         assert "session_id_source" in output
+
+
+class TestConflictInfoExtraction:
+    """ConflictInfo should be defined in lib/types.py, not inline in setup-session.py."""
+
+    def test_conflict_info_importable_from_lib_types(self):
+        """ConflictInfo should be importable from lib.types."""
+        from lib.types import ConflictInfo
+        info = ConflictInfo(
+            task_list_id="test",
+            existing_task_count=3,
+            sample_subjects=("A", "B"),
+        )
+        assert info.task_list_id == "test"
+        assert info.existing_task_count == 3
+        assert info.sample_subjects == ("A", "B")
+
+    def test_conflict_info_not_defined_in_setup_session(self):
+        """setup-session.py should NOT define ConflictInfo inline."""
+        source_path = Path(__file__).parent.parent / "scripts" / "checks" / "setup-session.py"
+        source = source_path.read_text()
+        assert "class ConflictInfo" not in source, (
+            "ConflictInfo is still defined inline in setup-session.py — "
+            "it should be imported from lib.types"
+        )

@@ -28,7 +28,6 @@ Output (JSON):
 import argparse
 import json
 import sys
-from dataclasses import dataclass
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -42,6 +41,7 @@ from lib.config import (
 from lib.state import detect_state
 from lib.task_reconciliation import TaskListContext, TaskListSource
 from lib.task_storage import get_tasks_dir, write_tasks
+from lib.types import ConflictInfo
 from lib.tasks import (
     TASK_DEPENDENCIES,
     build_dependency_graph,
@@ -72,15 +72,6 @@ def validate_input_file(file_path: str) -> tuple[bool, str]:
     # Let other exceptions propagate for debugging (per CLAUDE.md)
 
     return True, ""
-
-
-@dataclass(frozen=True, slots=True, kw_only=True)
-class ConflictInfo:
-    """Information about conflicting existing tasks."""
-
-    task_list_id: str
-    existing_task_count: int
-    sample_subjects: list[str]
 
 
 def check_for_conflict(
@@ -124,7 +115,7 @@ def check_for_conflict(
     return ConflictInfo(
         task_list_id=task_list_id,
         existing_task_count=len(task_files),
-        sample_subjects=sample_subjects,
+        sample_subjects=tuple(sample_subjects),
     )
 
 
