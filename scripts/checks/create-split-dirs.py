@@ -67,7 +67,15 @@ def main() -> int:
     for split_name in result.splits:
         split_dir = planning_dir / split_name
         if split_dir.exists():
-            skipped.append(split_name)
+            if split_dir.is_dir():
+                skipped.append(split_name)
+            else:
+                print(json.dumps({
+                    "success": False,
+                    "error": f"Cannot create directory '{split_name}': a file already exists at {split_dir}",
+                    "created": created
+                }, indent=2))
+                return 1
         else:
             split_dir.mkdir(parents=False, exist_ok=False)
             created.append(split_name)

@@ -230,3 +230,41 @@ END_MANIFEST -->""")
             "02-user-management-service",
             "03-auth"
         ]
+
+    def test_duplicate_split_names_different_indices(self, tmp_path):
+        """Should detect duplicate split names even with different indices."""
+        manifest = tmp_path / "project-manifest.md"
+        manifest.write_text("""<!-- SPLIT_MANIFEST
+01-setup
+02-setup
+END_MANIFEST -->""")
+
+        result = parse_manifest(manifest)
+        assert result.is_valid is False
+        assert any("Duplicate split name" in e for e in result.errors)
+        assert any("setup" in e for e in result.errors)
+        assert any("01" in e and "02" in e for e in result.errors)
+
+    def test_uppercase_split_name_rejected_before_duplicate_check(self, tmp_path):
+        """Uppercase names fail regex validation before reaching duplicate check."""
+        manifest = tmp_path / "project-manifest.md"
+        manifest.write_text("""<!-- SPLIT_MANIFEST
+01-Setup
+02-setup
+END_MANIFEST -->""")
+
+        result = parse_manifest(manifest)
+        assert result.is_valid is False
+        assert any("Invalid split name" in e for e in result.errors)
+
+    def test_valid_unique_names_still_pass(self, tmp_path):
+        """Manifests with unique names should still pass validation."""
+        manifest = tmp_path / "project-manifest.md"
+        manifest.write_text("""<!-- SPLIT_MANIFEST
+01-backend
+02-frontend
+03-shared
+END_MANIFEST -->""")
+
+        result = parse_manifest(manifest)
+        assert result.is_valid is True

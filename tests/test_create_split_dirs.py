@@ -8,8 +8,8 @@ from pathlib import Path
 import pytest
 
 
-def run_create_split_dirs(planning_dir: Path) -> dict:
-    """Helper to run create-split-dirs.py and return parsed output."""
+def run_create_split_dirs_with_rc(planning_dir: Path) -> tuple[dict, int]:
+    """Helper to run create-split-dirs.py and return parsed output + exit code."""
     result = subprocess.run(
         [
             "uv", "run", "scripts/checks/create-split-dirs.py",
@@ -19,7 +19,13 @@ def run_create_split_dirs(planning_dir: Path) -> dict:
         text=True,
         cwd=Path(__file__).parent.parent
     )
-    return json.loads(result.stdout)
+    return json.loads(result.stdout), result.returncode
+
+
+def run_create_split_dirs(planning_dir: Path) -> dict:
+    """Helper to run create-split-dirs.py and return parsed output."""
+    output, _ = run_create_split_dirs_with_rc(planning_dir)
+    return output
 
 
 @pytest.mark.integration
@@ -162,3 +168,64 @@ END_MANIFEST -->""")
         assert "skipped" in output
         assert "manifest_splits" in output
         assert "message" in output
+
+    def test_fails_when_file_exists_at_directory_path(self, tmp_path):
+        """Should fail with error when a file exists where a directory should be created."""
+        manifest = tmp_path / "project-manifest.md"
+        manifest.write_text("""<!-- SPLIT_MANIFEST
+01-backend
+02-frontend
+END_MANIFEST -->""")
+
+        # Place a regular file where 02-frontend directory should be
+        (tmp_path / "02-frontend").write_text("I am a file, not a directory")
+
+        output, rc = run_create_split_dirs_with_rc(tmp_path)
+
+        assert output["success"] is False
+        assert "02-frontend" in output["error"]
+        assert str(tmp_path / "02-frontend") in output["error"]
+        assert rc != 0
+
+    def test_file_at_path_reports_created_before_failure(self, tmp_path):
+        """Should include 'created' list of directories made before hitting the blocking file."""
+        manifest = tmp_path / "project-manifest.md"
+        manifest.write_text("""<!-- SPLIT_MANIFEST
+01-setup
+02-models
+03-routes
+04-tests
+05-api
+END_MANIFEST -->""")
+
+        # Place a regular file at 05-api
+        (tmp_path / "05-api").write_text("blocking file")
+
+        output, rc = run_create_split_dirs_with_rc(tmp_path)
+
+        assert output["success"] is False
+        assert output["created"] == ["01-setup", "02-models", "03-routes", "04-tests"]
+        # Verify the four directories actually exist on disk
+        for name in ["01-setup", "02-models", "03-routes", "04-tests"]:
+            assert (tmp_path / name).is_dir()
+
+    def test_file_at_path_stops_creating_after_failure(self, tmp_path):
+        """Should not create directories after the blocking file (fail-fast)."""
+        manifest = tmp_path / "project-manifest.md"
+        manifest.write_text("""<!-- SPLIT_MANIFEST
+01-setup
+02-models
+03-routes
+04-tests
+05-api
+06-deploy
+END_MANIFEST -->""")
+
+        # Place a regular file at 05-api
+        (tmp_path / "05-api").write_text("blocking file")
+
+        output, rc = run_create_split_dirs_with_rc(tmp_path)
+
+        assert output["success"] is False
+        # 06-deploy should NOT have been created
+        assert not (tmp_path / "06-deploy").exists()

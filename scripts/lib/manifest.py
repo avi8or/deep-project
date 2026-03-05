@@ -88,6 +88,18 @@ def parse_manifest(manifest_path: Path | str) -> ParsedManifest:
             errors.append(f"Duplicate index {idx:02d} in split '{split}'")
         seen_indices.add(idx)
 
+    # Check for duplicate names (different indices, same name part)
+    seen_names: dict[str, str] = {}  # name -> full split entry
+    for split in splits:
+        name = split[3:].lower()
+        if name in seen_names:
+            errors.append(
+                f"Duplicate split name: '{name}' appears at indices "
+                f"{seen_names[name][:2]} and {split[:2]}"
+            )
+        else:
+            seen_names[name] = split
+
     # Check for sequential indices (warning, not error)
     if splits and not errors:
         expected = list(range(1, len(splits) + 1))
